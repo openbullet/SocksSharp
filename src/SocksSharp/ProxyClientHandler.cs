@@ -56,6 +56,11 @@ namespace SocksSharp
         public bool SupportsRedirectConfiguration => true;
 
         /// <summary>
+        /// The allowed SSL or TLS protocols.
+        /// </summary>
+        public SslProtocols SslProtocols { get; set; } = SslProtocols.None;
+
+        /// <summary>
         /// Gets the type of decompression method used by the handler for automatic 
         /// decompression of the HTTP content response.
         /// </summary>
@@ -183,7 +188,7 @@ namespace SocksSharp
                 {
                     SslStream sslStream;
                     sslStream = new SslStream(connectionNetworkStream, false, ServerCertificateCustomValidationCallback);
-                    sslStream.AuthenticateAsClient(uri.Host);
+                    sslStream.AuthenticateAsClient(uri.Host, null, SslProtocols, true);
                     connectionCommonStream = sslStream;
                 }
                 catch (Exception ex)
