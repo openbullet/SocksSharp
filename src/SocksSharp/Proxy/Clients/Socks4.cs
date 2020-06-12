@@ -22,10 +22,8 @@ THE SOFTWARE.
 
 using System;
 using System.IO;
-using System.Net;
 using System.Text;
 using System.Net.Sockets;
-
 using SocksSharp.Helpers;
 using SocksSharp.Core.Helpers;
 
