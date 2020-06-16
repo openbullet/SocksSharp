@@ -7,6 +7,7 @@ using SocksSharp.Extensions;
 using SocksSharp.Helpers;
 using System.Net.Http.Headers;
 using System.Net;
+using System.Linq;
 
 namespace SocksSharp.Proxy.Request
 {
@@ -83,7 +84,7 @@ namespace SocksSharp.Proxy.Request
                 }
             }
 
-            if (headers is HttpContentHeaders && !headersList.Contains("Content-Length"))
+            if (headers is HttpContentHeaders && !headersList.Any(h => h.StartsWith("Content-Length")))
             {
                 var content = headers as HttpContentHeaders;
                 if(content.ContentLength.HasValue && content.ContentLength.Value > 0)
