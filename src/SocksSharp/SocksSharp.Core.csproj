@@ -6,7 +6,7 @@
     <AssemblyTitle>SocksSharp</AssemblyTitle>
     <VersionPrefix>1.1.0</VersionPrefix>
     <Authors>Artem Dontsov, Ruri</Authors>
-    <TargetFrameworks>netstandard2.0;net452</TargetFrameworks>
+    <TargetFrameworks>net5.0</TargetFrameworks>
     <NoWarn>$(NoWarn);1591</NoWarn>
     <AssemblyName>SocksSharp</AssemblyName>
     <PackageId>Ruri.SocksSharp</PackageId>
@@ -17,14 +17,11 @@
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-    <Version>1.1.1</Version>
+    <Version>1.2.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DocumentationFile>bin\Debug\documentation.xml</DocumentationFile>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="System.Net.Http" Version="4.3.2" />
-  </ItemGroup>
+  
 </Project>
