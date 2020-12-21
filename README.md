@@ -7,7 +7,7 @@ SocksSharp provides support for Socks4/4a/5 proxy servers to [HttpClient](https:
 
 ## Installation
 
-Install as [NuGet package](https://www.nuget.org/packages/SocksSharp/):
+Install as [NuGet package](https://www.nuget.org/packages/Ruri.SocksSharp/):
 
 ```powershell
 Install-Package Ruri.SocksSharp
