@@ -42,18 +42,31 @@ namespace SocksSharp.Proxy
         /// </exception>
         public NetworkStream GetDestinationStream(string destinationHost, int destinationPort)
         {
-            TcpClient tcpClient = null;
+            TcpClient tcpClient = new TcpClient()
+            {
+                ReceiveTimeout = Settings.ReadWriteTimeOut,
+                SendTimeout = Settings.ReadWriteTimeOut
+            };
+
             client.Settings = Settings;
-
-            #region Create Connection
-
-            tcpClient = new TcpClient();
             Exception connectException = null;
             var connectDoneEvent = new ManualResetEventSlim();
 
+            var host = Settings.Host;
+            var port = Settings.Port;
+
+            // Added by Ruri for the NoProxy case, connect directly to the server without proxy
+            if (client is NoProxy)
+            {
+                host = destinationHost;
+                port = destinationPort;
+            }
+
+            #region Create Connection
+
             try
             {
-                tcpClient.BeginConnect(Settings.Host, Settings.Port, new AsyncCallback(
+                tcpClient.BeginConnect(host, port, new AsyncCallback(
                     (ar) =>
                     {
                         if (tcpClient.Client != null)
@@ -78,7 +91,7 @@ namespace SocksSharp.Proxy
 
                 if (ex is SocketException || ex is SecurityException)
                 {
-                    throw new ProxyException("Failed to connect to proxy-server", ex);
+                    throw new ProxyException($"Failed to connect to {(client is NoProxy ? "server" : "proxy-server")}", ex);
                 }
 
                 throw;
@@ -87,7 +100,7 @@ namespace SocksSharp.Proxy
             if (!connectDoneEvent.Wait(Settings.ConnectTimeout))
             {
                 tcpClient.Close();
-                throw new ProxyException("Failed to connect to proxy-server");
+                throw new ProxyException($"Failed to connect to {(client is NoProxy ? "server" : "proxy-server")}");
             }
 
             if (connectException != null)
@@ -96,7 +109,7 @@ namespace SocksSharp.Proxy
 
                 if (connectException is SocketException)
                 {
-                    throw new ProxyException("Failed to connect to proxy-server", connectException);
+                    throw new ProxyException($"Failed to connect to {(client is NoProxy ? "server" : "proxy-server")}", connectException);
                 }
                 else
                 {
@@ -107,7 +120,7 @@ namespace SocksSharp.Proxy
             if (!tcpClient.Connected)
             {
                 tcpClient.Close();
-                throw new ProxyException("Failed to connect to proxy-server");
+                throw new ProxyException($"Failed to connect to {(client is NoProxy ? "server" : "proxy-server")}");
             }
 
             #endregion
