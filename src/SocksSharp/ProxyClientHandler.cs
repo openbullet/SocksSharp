@@ -10,6 +10,8 @@ using System.Threading.Tasks;
 using SocksSharp.Proxy;
 using SocksSharp.Proxy.Request;
 using SocksSharp.Proxy.Response;
+using System.Security.Cryptography.X509Certificates;
+using System.Collections.Generic;
 
 namespace SocksSharp
 {
@@ -57,6 +59,37 @@ namespace SocksSharp
         /// The allowed SSL or TLS protocols.
         /// </summary>
         public SslProtocols SslProtocols { get; set; } = SslProtocols.None;
+
+        /// <summary>
+        /// If true, <see cref="AllowedCipherSuites"/> will be used instead of the default ones.
+        /// </summary>
+        public bool UseCustomCipherSuites { get; set; } = false;
+
+        /// <summary>
+        /// The cipher suites to send to the server during the TLS handshake, in order.
+        /// The default value of this property contains the cipher suites sent by Firefox as of 21 Dec 2020.
+        /// </summary>
+        public TlsCipherSuite[] AllowedCipherSuites { get; set; } = new TlsCipherSuite[]
+        {
+            TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+            TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+            TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+            TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+            TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+            TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,
+            TlsCipherSuite.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+            TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+            TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+            TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+            TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+            TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+            TlsCipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+            TlsCipherSuite.TLS_RSA_WITH_AES_128_GCM_SHA256,
+            TlsCipherSuite.TLS_RSA_WITH_AES_256_GCM_SHA384,
+            TlsCipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA,
+            TlsCipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA,
+            TlsCipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA
+        };
 
         /// <summary>
         /// Gets the type of decompression method used by the handler for automatic 
@@ -186,7 +219,18 @@ namespace SocksSharp
                 {
                     SslStream sslStream;
                     sslStream = new SslStream(connectionNetworkStream, false, ServerCertificateCustomValidationCallback);
-                    sslStream.AuthenticateAsClient(uri.Host, null, SslProtocols, true);
+
+                    var sslOptions = new SslClientAuthenticationOptions
+                    {
+                        TargetHost = uri.Host,
+                        EnabledSslProtocols = SslProtocols,
+                        CertificateRevocationCheckMode = X509RevocationMode.Online
+                    };
+
+                    if (UseCustomCipherSuites)
+                        sslOptions.CipherSuitesPolicy = new CipherSuitesPolicy(AllowedCipherSuites);
+
+                    sslStream.AuthenticateAsClient(sslOptions);
                     connectionCommonStream = sslStream;
                 }
                 catch (Exception ex)
