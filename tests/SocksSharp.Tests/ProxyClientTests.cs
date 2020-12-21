@@ -12,6 +12,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net;
+using System.Net.Security;
+using System.Runtime.InteropServices;
 
 namespace SocksSharp.Tests
 {
@@ -231,6 +233,55 @@ namespace SocksSharp.Tests
 
             Assert.NotNull(response);
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task HttpClient_SendAsync_NoProxy_GetCorrectSource()
+        {
+            var message = new HttpRequestMessage(HttpMethod.Get, "https://example.com");
+            message.Headers.Host = "example.com";
+
+            using var handler = new ProxyClientHandler<NoProxy>(new ProxySettings());
+            using var client = new HttpClient(handler);
+            var response = await client.SendAsync(message);
+            var page = await response.Content.ReadAsStringAsync();
+
+            Assert.Contains("<title>Example Domain</title>", page);
+        }
+
+        [Fact]
+        public async Task HttpClient_SendAsync_SetCipherSuites_SendsCorrectly()
+        {
+            // Custom cipher suites are not currently supported on Windows as it uses
+            // SecureChannel for the TLS handshake, and ciphers are set by the windows policies.
+            // The only known workaround is implementing an OpenSSL / BouncyCastle solution or just using WSL or a linux VM.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return;
+
+            var message = new HttpRequestMessage(HttpMethod.Get, "https://www.howsmyssl.com/");
+            message.Headers.Host = "howsmyssl.com";
+
+            using var handler = new ProxyClientHandler<NoProxy>(new ProxySettings());
+            handler.UseCustomCipherSuites = true;
+            handler.AllowedCipherSuites = new TlsCipherSuite[]
+            {
+                TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+                TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+                TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+            };
+
+            using var client = new HttpClient(handler);
+            var response = await client.SendAsync(message);
+            var page = await response.Content.ReadAsStringAsync();
+
+            Assert.Contains("TLS_AES_256_GCM_SHA384", page);
+            Assert.Contains("TLS_CHACHA20_POLY1305_SHA256", page);
+            Assert.Contains("TLS_AES_128_GCM_SHA256", page);
+            Assert.Contains("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", page);
+
+            // Make sure it does not contain a cipher suite that we didn't send but that is usually sent by System.Net
+            Assert.DoesNotContain("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", page);
         }
 
         #endregion
