@@ -224,7 +224,7 @@ namespace SocksSharp
                     {
                         TargetHost = uri.Host,
                         EnabledSslProtocols = SslProtocols,
-                        CertificateRevocationCheckMode = X509RevocationMode.Online
+                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck
                     };
 
                     if (UseCustomCipherSuites)
