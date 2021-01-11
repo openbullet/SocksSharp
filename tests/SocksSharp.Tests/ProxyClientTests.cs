@@ -183,6 +183,7 @@ namespace SocksSharp.Tests
 
             var handler = CreateNewSocks5Client();
             handler.CookieContainer = new System.Net.CookieContainer();
+            handler.UseCookies = true;
             var client = new HttpClient(handler);
 
             try
