@@ -120,6 +120,11 @@ namespace SocksSharp
         /// </summary>
         public RemoteCertificateValidationCallback ServerCertificateCustomValidationCallback { get; set; }
 
+        /// <summary>
+        /// Gets or sets the X509 certificate revocation mode.
+        /// </summary>
+        public X509RevocationMode CertRevocationMode { get; set; }
+
         #endregion
 
         /// <summary>
@@ -224,7 +229,7 @@ namespace SocksSharp
                     {
                         TargetHost = uri.Host,
                         EnabledSslProtocols = SslProtocols,
-                        CertificateRevocationCheckMode = X509RevocationMode.NoCheck
+                        CertificateRevocationCheckMode = CertRevocationMode
                     };
 
                     if (UseCustomCipherSuites)
