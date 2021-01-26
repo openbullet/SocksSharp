@@ -166,7 +166,7 @@ namespace SocksSharp
                     throw new ArgumentNullException(nameof(CookieContainer));
                 }
 
-                CreateConnection(request);
+                await CreateConnection(request, cancellationToken);
                 await SendDataAsync(request, cancellationToken).ConfigureAwait(false);
                 var responseMessage = await ReceiveDataAsync(request, cancellationToken).ConfigureAwait(false);
 
@@ -206,15 +206,16 @@ namespace SocksSharp
             }
         }
 
-        private async Task<HttpResponseMessage> ReceiveDataAsync(HttpRequestMessage request, CancellationToken ct)
+        private async Task<HttpResponseMessage> ReceiveDataAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
             var responseBuilder = UseCookies
                 ? new ResponseBuilder(1024, CookieContainer, request.RequestUri)
                 : new ResponseBuilder(1024);
-            return await responseBuilder.GetResponseAsync(request, connectionCommonStream, ct);
+            return await responseBuilder.GetResponseAsync(request, connectionCommonStream, cancellationToken);
         }
 
-        private void CreateConnection(HttpRequestMessage request)
+        private async Task CreateConnection(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Uri uri = request.RequestUri;
             connectionNetworkStream = proxyClient.GetDestinationStream(uri.Host, uri.Port);
@@ -235,7 +236,7 @@ namespace SocksSharp
                     if (UseCustomCipherSuites)
                         sslOptions.CipherSuitesPolicy = new CipherSuitesPolicy(AllowedCipherSuites);
 
-                    sslStream.AuthenticateAsClient(sslOptions);
+                    await sslStream.AuthenticateAsClientAsync(sslOptions, cancellationToken);
                     connectionCommonStream = sslStream;
                 }
                 catch (Exception ex)
