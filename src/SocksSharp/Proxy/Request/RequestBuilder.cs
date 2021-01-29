@@ -2,11 +2,12 @@
 using System.Text;
 using System.Net.Http;
 using System.Collections.Generic;
+
 using SocksSharp.Extensions;
+using SocksSharp.Helpers;
 using System.Net.Http.Headers;
 using System.Net;
 using System.Linq;
-using SocksSharp.Core.Extensions;
 
 namespace SocksSharp.Proxy.Request
 {
@@ -94,7 +95,7 @@ namespace SocksSharp.Proxy.Request
 
             if(cookies != null)
             {
-                var cookiesCollection = cookies.GetAllCookies();
+                var cookiesCollection = cookies.GetCookies(request.RequestUri);
                 var rawCookies = "Cookie: ";
                 
                 foreach(var cookie in cookiesCollection)
