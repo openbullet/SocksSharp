@@ -1,38 +1,25 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Net.Http;
-using Microsoft.Extensions.Configuration;
 using Xunit;
-
-using SocksSharp;
 using SocksSharp.Proxy;
 using System.Threading.Tasks;
-using System.IO;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Security;
 using System.Runtime.InteropServices;
+using System.Net.Http.Headers;
 
 namespace SocksSharp.Tests
 {
-    public class ProxyClientTests
+    public class NoProxyTests
     {
-        private ProxySettings proxySettings;
-
-        public ProxyClientTests()
-        {
-            GatherTestConfiguration();
-        }
-
         #region Tests
 
         [Fact]
         public async Task RequestHeadersTest()
         {
-            EnsureIsConfigured();
-
             var userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36";
 
             var message = new HttpRequestMessage();
@@ -53,8 +40,6 @@ namespace SocksSharp.Tests
         [Fact]
         public async Task GetRequestTest()
         {
-            EnsureIsConfigured();
-
             var key = "key";
             var value = "value";
 
@@ -73,8 +58,6 @@ namespace SocksSharp.Tests
         [Fact]
         public async Task GetUtf8Test()
         {
-            EnsureIsConfigured();
-
             var excepted = "∮";
 
             var message = new HttpRequestMessage();
@@ -91,8 +74,6 @@ namespace SocksSharp.Tests
         [Fact]
         public async Task GetHtmlPageTest()
         {
-            EnsureIsConfigured();
-
             long exceptedLength = 3741;
             var contentType = "text/html";
             var charSet = "utf-8";
@@ -119,8 +100,6 @@ namespace SocksSharp.Tests
         [Fact]
         public async Task DelayTest()
         {
-            EnsureIsConfigured();
-
             var message = new HttpRequestMessage();
             message.Method = HttpMethod.Get;
             message.RequestUri = new Uri("http://httpbin.org/delay/4");
@@ -135,8 +114,6 @@ namespace SocksSharp.Tests
         [Fact]
         public async Task StreamTest()
         {
-            EnsureIsConfigured();
-
             var message = new HttpRequestMessage();
             message.Method = HttpMethod.Get;
             message.RequestUri = new Uri("http://httpbin.org/stream/20");
@@ -151,8 +128,6 @@ namespace SocksSharp.Tests
         [Fact]
         public async Task GzipTest()
         {
-            EnsureIsConfigured();
-
             var excepted = "gzip, deflate";
 
             var message = new HttpRequestMessage();
@@ -168,12 +143,8 @@ namespace SocksSharp.Tests
         }
 
         [Fact]
-        public async Task CookiesTest()
+        public async Task ReceivedCookiesTest()
         {
-            EnsureIsConfigured();
-
-            HttpResponseMessage response = null;
-
             var name = "name";
             var value = "value";
 
@@ -181,20 +152,11 @@ namespace SocksSharp.Tests
             message.Method = HttpMethod.Get;
             message.RequestUri = new Uri($"http://httpbin.org/cookies/set?{name}={value}");
 
-            var handler = CreateNewSocks5Client();
+            var handler = CreateNoProxyHandler();
             handler.CookieContainer = new System.Net.CookieContainer();
             handler.UseCookies = true;
             var client = new HttpClient(handler);
-
-            try
-            {
-                response = await client.SendAsync(message);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("Exception caught! " + ex.Message);
-            }
-
+            HttpResponseMessage response = await client.SendAsync(message);
             Assert.NotNull(response);
             var cookies = handler.CookieContainer.GetCookies(new Uri("http://httpbin.org/"));
 
@@ -208,10 +170,43 @@ namespace SocksSharp.Tests
         }
 
         [Fact]
+        public async Task SentCookies_WithContent_Test()
+        {
+            var name = "name";
+            var value = "value";
+            var uri = new Uri("http://httpbin.org/cookies");
+
+            var message = new HttpRequestMessage
+            {
+                Method = HttpMethod.Get,
+                RequestUri = uri
+            };
+
+            var handler = CreateNoProxyHandler();
+            var cookieContainer = new CookieContainer();
+            cookieContainer.Add(uri, new Cookie(name, value));
+            handler.CookieContainer = cookieContainer;
+            handler.UseCookies = true;
+            var client = new HttpClient(handler);
+
+            message.Content = new StringContent(string.Empty);
+            message.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/x-www-form-urlencoded");
+
+            HttpResponseMessage response = await client.SendAsync(message);
+            Assert.NotNull(response);
+
+            var cookies = await GetJsonDictionaryValue(response, "cookies");
+            Assert.Equal(1, cookies.Count);
+            Assert.True(cookies.ContainsKey(name));
+            Assert.Equal(value, cookies[name]);
+
+            handler.Dispose();
+            client.Dispose();
+        }
+
+        [Fact]
         public async Task StatusCodeTest()
         {
-            EnsureIsConfigured();
-
             var code = "404";
             var excepted = "NotFound";
             var message = new HttpRequestMessage();
@@ -236,68 +231,54 @@ namespace SocksSharp.Tests
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
 
+        [Fact]
+        public async Task HttpClient_SendAsync_SetCipherSuites_SendsCorrectly()
+        {
+            // Custom cipher suites are not currently supported on Windows as it uses
+            // SecureChannel for the TLS handshake, and ciphers are set by the windows policies.
+            // The only known workaround is implementing an OpenSSL / BouncyCastle solution or just using WSL or a linux VM.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                return;
+
+            var message = new HttpRequestMessage(HttpMethod.Get, "https://www.howsmyssl.com/");
+            message.Headers.Host = "howsmyssl.com";
+
+            using var handler = new ProxyClientHandler<NoProxy>(new ProxySettings());
+            handler.UseCustomCipherSuites = true;
+            handler.AllowedCipherSuites = new TlsCipherSuite[]
+            {
+                TlsCipherSuite.TLS_AES_256_GCM_SHA384,
+                TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256,
+                TlsCipherSuite.TLS_AES_128_GCM_SHA256,
+                TlsCipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+            };
+
+            using var client = new HttpClient(handler);
+            var response = await client.SendAsync(message);
+            var page = await response.Content.ReadAsStringAsync();
+
+            Assert.Contains("TLS_AES_256_GCM_SHA384", page);
+            Assert.Contains("TLS_CHACHA20_POLY1305_SHA256", page);
+            Assert.Contains("TLS_AES_128_GCM_SHA256", page);
+            Assert.Contains("TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384", page);
+
+            // Make sure it does not contain a cipher suite that we didn't send but that is usually sent by System.Net
+            Assert.DoesNotContain("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", page);
+        }
+
         #endregion
 
         #region Helpers
 
-        private void GatherTestConfiguration()
-        {
-            IConfigurationRoot configuration;
-
-            var appConfigMsgWarning = "{0} not configured in proxysettings.json! Some tests may fail.";
-
-
-            try
-            {
-                configuration = new ConfigurationBuilder()
-                                .AddJsonFile("proxysettings.json")
-                                .Build();
-            }
-            catch (FileNotFoundException)
-            {
-                Debug.WriteLine("proxysettings.json not found in project folder");
-                return;
-            }
-
-            proxySettings = new ProxySettings();
-
-            var host = configuration["host"];
-            if (String.IsNullOrEmpty(host))
-            {
-                Debug.WriteLine(String.Format(appConfigMsgWarning, nameof(host)));
-            }
-            else
-            {
-                proxySettings.Host = host;
-            }
-
-            var port = configuration["port"];
-            if (String.IsNullOrEmpty(port))
-            {
-                Debug.WriteLine(String.Format(appConfigMsgWarning, nameof(port)));
-            }
-            else
-            {
-                proxySettings.Port = Int32.Parse(port);
-            }
-
-            //TODO: Setup manualy
-            var username = configuration["username"];
-            var password = configuration["password"];
-        }
-
-        private ProxyClientHandler<Socks5> CreateNewSocks5Client()
-        {
-            return new ProxyClientHandler<Socks5>(proxySettings);
-        }
+        private ProxyClientHandler<Http> CreateFiddlerHandler() => new(new() { Host = "127.0.0.1", Port = 8888 });
+        private ProxyClientHandler<NoProxy> CreateNoProxyHandler() => new(new ProxySettings());
 
         private async Task<string> GetJsonStringValue(HttpResponseMessage response, string valueName)
         {
-            JToken token;
             var source = await response.Content.ReadAsStringAsync();
             var obj = JObject.Parse(source);
 
-            var result = obj.TryGetValue(valueName, out token);
+            var result = obj.TryGetValue(valueName, out JToken token);
 
             if (!result)
             {
@@ -309,11 +290,10 @@ namespace SocksSharp.Tests
 
         private async Task<Dictionary<string, string>> GetJsonDictionaryValue(HttpResponseMessage response, string valueName)
         {
-            JToken token;
             var source = await response.Content.ReadAsStringAsync();
             var obj = JObject.Parse(source);
 
-            var result = obj.TryGetValue(valueName, out token);
+            var result = obj.TryGetValue(valueName, out JToken token);
 
             if (!result)
             {
@@ -325,34 +305,9 @@ namespace SocksSharp.Tests
 
         private async Task<HttpResponseMessage> GetResponseMessageAsync(HttpRequestMessage requestMessage)
         {
-            HttpResponseMessage response = null;
-
-            var handler = CreateNewSocks5Client();
-            var client = new HttpClient(handler);
-
-            try
-            {
-                response = await client.SendAsync(requestMessage);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine("Exception caught! " + ex.Message);
-            }
-
-            handler.Dispose();
-            client.Dispose();
-
-            return response;
-        }
-
-        private void EnsureIsConfigured()
-        {
-            if (proxySettings == null
-                || proxySettings.Host == null
-                || proxySettings.Port == 0)
-            {
-                throw new Exception("Please add your proxy settings to proxysettings.json in build folder");
-            }
+            using var handler = CreateNoProxyHandler();
+            using var client = new HttpClient(handler);
+            return await client.SendAsync(requestMessage);
         }
 
         #endregion

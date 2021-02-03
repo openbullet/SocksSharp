@@ -93,7 +93,7 @@ namespace SocksSharp.Proxy.Request
                 }
             }
 
-            if(cookies != null)
+            if (headers is not HttpContentHeaders && cookies != null)
             {
                 var cookiesCollection = cookies.GetCookies(request.RequestUri);
                 var rawCookies = "Cookie: ";
